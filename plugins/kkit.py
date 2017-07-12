@@ -6,7 +6,7 @@ __version__     =   "1.0.0"
 __maintainer__  =   "HarshaRani"
 __email__       =   "hrani@ncbs.res.in"
 __status__      =   "Development"
-__updated__     =   "Mar 7 2017"
+__updated__     =   "July 11 2017"
 import math
 import sys
 from PyQt4 import QtGui, QtCore, Qt
@@ -18,7 +18,7 @@ from moose.genesis.writeKkit import mooseWriteKkit
 #sys.path.append('plugins')
 from mplugin import *
 from kkitUtil import *
-from kkitQGraphics import PoolItem, ReacItem,EnzItem,CplxItem,ComptItem
+from kkitQGraphics import *
 from kkitViewcontrol import *
 from kkitCalcArrow import *
 from kkitOrdinateUtil import *
@@ -334,7 +334,7 @@ class  KineticsWidget(EditorWidgetBase):
         self.positionInfoExist  = True
         self.defaultComptsize   = 5
         self.srcdesConnection   = {}
-        
+        self.meshEntry          = {}
         self.mooseId_GObj       = {}
         self.qGraCompt          = {}
         self.xyCord             = {}
@@ -419,22 +419,47 @@ class  KineticsWidget(EditorWidgetBase):
         self.m = wildcardFind(self.modelRoot+'/##[ISA=ChemCompt]')
         if self.m:
             self.srcdesConnection = {}
+            if self.meshEntry:
+                self.meshEntry.clear()
+            else:
+                self.meshEntry = {}
             #self.meshEntry.clear= {}
             # Compartment and its members are setup
             #self.meshEntry,self.xmin,self.xmax,self.ymin,self.ymax,self.noPositionInfo = setupMeshObj(self.modelRoot)
 
-            self.meshEntry,xcord,ycord = setupMeshObj(self.modelRoot)
-            self.positionInfoExist = not(len(np.nonzero(xcord)[0]) == 0 \
-                                     and len(np.nonzero(ycord)[0]) == 0)
-            
+            # self.meshEntry,xcord,ycord = setupMeshObj(self.modelRoot)
+            # self.positionInfoExist = not(len(np.nonzero(xcord)[0]) == 0 \
+            #                          and len(np.nonzero(ycord)[0]) == 0)
+            self.objPar,self.meshEntry,self.xmin,self.xmax,self.ymin,self.ymax,self.noPositionInfo = setupMeshObj(self.modelRoot)
+            self.autocoordinates = False
+
             if self.srcdesConnection:
                 self.srcdesConnection.clear()
             else:
                 self.srcdesConnection = {}
             setupItem(self.modelRoot,self.srcdesConnection)
-            if not self.positionInfoExist:
-                autoCoordinates(self.meshEntry,self.srcdesConnection)
-                                    
+
+            if not self.noPositionInfo:
+                self.autocoordinates = True
+                self.xmin,self.xmax,self.ymin,self.ymax,self.autoCordinatepos = autoCoordinates(self.meshEntry,self.srcdesConnection)
+                #autoCoordinates(self.meshEntry,self.srcdesConnection)
+        
+        self.size = QtCore.QSize(1000 ,550)
+        if self.xmax-self.xmin != 0:
+            self.xratio = (self.size.width()-10)/(self.xmax-self.xmin)
+        else: self.xratio = self.size.width()-10
+
+        if self.ymax-self.ymin:
+            self.yratio = (self.size.height()-10)/(self.ymax-self.ymin)
+        else: self.yratio = (self.size.height()-10)
+        
+        self.xratio = int(self.xratio)
+        self.yratio = int(self.yratio)
+        if self.xratio == 0:
+            self.xratio = 1
+        if self.yratio == 0:
+            self.yratio = 1
+
     def sizeHint(self):
         return QtCore.QSize(800,400)
 
@@ -460,7 +485,7 @@ class  KineticsWidget(EditorWidgetBase):
         item = self.mooseId_GObj[mooseObject]
         if (isinstance(item,PoolItem) or isinstance(item,EnzItem) or isinstance(item,MMEnzItem) ):
             item.updateColor(color)
-
+    '''
     def mooseObjOntoscene(self):
         #  All the compartments are put first on to the scene \
         #  Need to do: Check With upi if empty compartments exist
@@ -536,6 +561,108 @@ class  KineticsWidget(EditorWidgetBase):
 
         # compartment's rectangle size is calculated depending on children
         self.comptChilrenBoundingRect()
+    '''
+    def mooseObjOntoscene(self):
+        #  All the compartments are put first on to the scene \
+        #  Need to do: Check With upi if empty compartments exist
+        self.qGraCompt   = {}
+        self.qGraGrp     = {}
+        self.mooseId_GObj = {}
+        if self.qGraCompt:
+            self.qGraCompt.clear()
+        else:
+            self.qGraCompt = {}
+
+        if self.qGraGrp:
+            self.qGraGrp.clear()
+        else:
+            self.qGraGrp = {}
+        
+        if self.qGraGrp:
+            self.qGraGrp.clear()
+        else:
+            self.qGraGrp = {}
+
+        if self.mooseId_GObj:
+            self.mooseId_GObj.clear()
+        else:
+            self.mooseId_GObj = {}
+        for k,v in self.objPar.items():
+            if isinstance(moose.element(k),moose.ChemCompt):
+                self.createCompt(k)
+                self.qGraCompt[k]
+                
+            elif isinstance(moose.element(k),Neutral):
+                if len(self.meshEntry[k]):
+                    if isinstance(moose.element(v), moose.ChemCompt):
+                        group_parent = self.qGraCompt[v]
+                    elif isinstance(moose.element(v), moose.Neutral):
+                        group_parent = self.qGraGrp[v]
+                    self.createGroup(k,group_parent)
+        for cmpt_grp,memb in self.meshEntry.items():
+            if len(memb):
+                if isinstance(moose.element(cmpt_grp),moose.ChemCompt):
+                    qtGrpparent = self.qGraCompt[cmpt_grp]
+                elif isinstance(moose.element(cmpt_grp), moose.Neutral):
+                    qtGrpparent = self.qGraGrp[cmpt_grp]
+                for mclass in ["enzyme","pool","reaction","cplx","function","stimTab"]:
+                    self.mObjontoscene(memb,mclass,qtGrpparent)
+
+        self.groupChildrenBoundingRect()
+        # compartment's rectangle size is calculated depending on children
+        self.comptChilrenBoundingRect()
+
+    def mObjontoscene(self,memb,mclass,qtGrpparent):
+        try:
+            value = memb[mclass]
+        except KeyError:
+            pass
+        else:
+            for mObj in memb[mclass]:
+                minfo = mObj.path+'/info'
+
+                if mObj.className in['Enz',"ZombieEnz"]:
+                    mItem = EnzItem(mObj,qtGrpparent)
+                
+                elif mObj.className in['MMenz',"ZombieMMenz"]:
+                    mItem = MMEnzItem(mObj,qtGrpparent)
+                
+                elif isinstance (moose.element(mObj),moose.PoolBase) and mclass != "cplx":
+                    #depending on Editor Widget or Run widget pool will be created a PoolItem or PoolItemCircle
+                    mItem = self.makePoolItem(mObj,qtGrpparent) 
+
+                elif isinstance (moose.element(mObj),moose.ReacBase):
+                    mItem = ReacItem(mObj,qtGrpparent)    
+                
+                elif mclass == "cplx":
+                    minfo = (mObj.parent).path+'/info'
+                    mItem = CplxItem(mObj,self.mooseId_GObj[element(mObj).parent])
+                    self.mooseId_GObj[element(mObj.getId())] = mItem
+                elif mclass == "function":
+                    if isinstance(moose.element(mObj.parent),moose.PoolBase):
+                        minfo = moose.element(mObj).path+'/info'
+                        Af = Annotator(minfo)
+                        qtGrpparent = self.mooseId_GObj[element(mObj.parent)]
+                    mItem = FuncItem(mObj,qtGrpparent)
+                elif mclass == "stimTab":
+                    minfo = mObj.path+'/info'
+                    mItem = TableItem(mObj,qtGrpparent)
+                self.mooseId_GObj[element(mObj.getId())] = mItem
+                self.setupDisplay(minfo,mItem,mclass)
+
+    def createGroup(self,key,parent):
+        self.new_GRP = GRPItem(parent,0,0,0,0,key)
+        self.qGraGrp[key] = self.new_GRP
+        self.new_GRP.setRect(20,20,20,20)
+
+    def groupChildrenBoundingRect(self):
+        for k, v in self.qGraGrp.items():
+            grpcolor = moose.Annotator(moose.element(k.path+'/info')).color
+            #Todo: One may need to calculate explicitly the boundary for Group also if there is a cross-group connection, then
+            # childrenBoundrect() will take the QPolygonItem position
+            rectcompt = v.childrenBoundingRect()
+            v.setRect(rectcompt.x()-10,rectcompt.y()-10,(rectcompt.width()+20),(rectcompt.height()+20))
+            v.setPen(QtGui.QPen(Qt.QColor(grpcolor), self.comptPen, Qt.Qt.SolidLine, Qt.Qt.RoundCap, Qt.Qt.RoundJoin))
 
     def comptChilrenBoundingRect(self):
         for k, v in self.qGraCompt.items():
@@ -613,13 +740,13 @@ class  KineticsWidget(EditorWidgetBase):
             if isinstance(out,tuple):
                 src = self.mooseId_GObj[inn]
                 if len(out[0])== 0:
-                    print inn.className + ' : ' +inn.name+ " doesn't output message"
+                    print( inn.className + ' : ' +inn.name+ " doesn't output message")
                 else:
                     for items in (items for items in out[0] ):
                         des = self.mooseId_GObj[element(items[0])]
                         self.lineCord(src,des,items,itemignoreZooming)
                 if len(out[1]) == 0:
-                    print inn.className + ' : ' +inn.name+ " doesn't output message"
+                    print ( inn.className + ' : ' +inn.name+ " doesn't output message")
                 else:
                     for items in (items for items in out[1] ):
                         des = self.mooseId_GObj[element(items[0])]
@@ -627,9 +754,9 @@ class  KineticsWidget(EditorWidgetBase):
             elif isinstance(out,list):
                 if len(out) == 0:
                     if inn.className == "StimulusTable":
-                        print inn.name +" doesn't have output"
+                        print (inn.name +" doesn't have output")
                     elif inn.className == "ZombieFunction" or inn.className == "Function":
-                        print inn.name + " doesn't have sumtotal "
+                        print (inn.name + " doesn't have sumtotal ")
                 else:
                     src = self.mooseId_GObj[inn]
                     for items in (items for items in out ):
@@ -640,7 +767,7 @@ class  KineticsWidget(EditorWidgetBase):
         endtype = type_no[1]
         line = 0
         if (src == "") and (des == ""):
-            print "Source or destination is missing or incorrect"
+            print ("Source or destination is missing or incorrect")
             return
         srcdes_list = [src,des,endtype,line]
         arrow = calcArrow(srcdes_list,itemignoreZooming,self.iconScale)
@@ -653,7 +780,7 @@ class  KineticsWidget(EditorWidgetBase):
             line = line +1
 
         if type_no[2] > 5:
-            print "Higher order reaction will not be displayed"
+            print ("Higher order reaction will not be displayed")
 
     def drawLine(self,srcdes_list,arrow):
         src = srcdes_list[0]
@@ -712,7 +839,43 @@ class  KineticsWidget(EditorWidgetBase):
                                             j = self.mooseId_GObj[moose.element(i)]
                                             self.updateArrow(j)
                             self.updateArrow(rectChilditem)
+        elif element(mooseObject).className == 'Neutral':
+            for k,v in self.qGraGrp.items():
+                if k.path == mooseObject:
+                    for grpChilditem in v.childItems():
+                        if isinstance(grpChilditem, KineticsDisplayItem):
+                            if moose.exists(grpChilditem.mobj.path):
+                                iInfo = grpChilditem.mobj.path+'/info'
+                                anno = moose.Annotator(iInfo)
+                                x = grpChilditem.scenePos().x()/self.defaultScenewidth
+                                y = grpChilditem.scenePos().y()/self.defaultSceneheight
+                                anno.x = x
+                                anno.y = y
+                            if isinstance(moose.element(grpChilditem.mobj.path),PoolBase):
+                                t = moose.element(grpChilditem.mobj.path)
+                                moose.element(t).children
+                                for items in moose.element(t).children:
+                                    if isinstance(moose.element(items),Function):
+                                        test = moose.element(items.path+'/x')
+                                        for i in moose.element(test).neighbors['input']:
+                                            j = self.mooseId_GObj[moose.element(i)]
+                                            self.updateArrow(j)
+                            self.updateArrow(grpChilditem)
+                            grpcompt = self.qGraCompt[self.objPar[k]]
+                            rectcompt = calculateChildBoundingRect(grpcompt)
+                            comptBoundingRect = grpcompt.boundingRect()
+                            if not comptBoundingRect.contains(rectcompt):
+                                self.updateCompartmentSize(grpcompt)
+                            else:
+                                pass
+                            '''
+                            rectcompt = calculateChildBoundingRect(grpcompt)
+                            comptBoundingRect = rectcompt.boundingRect()
+                            if not comptBoundingRect.contains(rectcompt):
+                                self.updateCompartmentSize(grpcompt)
+                            '''
         else:
+            print " why are else calling ", mooseObject
             mobj = self.mooseId_GObj[element(mooseObject)]
             self.updateArrow(mobj)
             elePath = moose.element(mooseObject).path
@@ -725,6 +888,8 @@ class  KineticsWidget(EditorWidgetBase):
                 comptBoundingRect = v.boundingRect()
                 if not comptBoundingRect.contains(rectcompt):
                     self.updateCompartmentSize(v)
+                else:
+                    print " Y"
                 '''
                 if linfo.modeltype == "new_kkit":
                     #if newly built model then compartment is size is fixed for some size.
@@ -738,12 +903,7 @@ class  KineticsWidget(EditorWidgetBase):
                 '''
     def updateCompartmentSize(self, compartment):
         compartmentBoundary = compartment.rect()
-        #print " compartmentBoundary ",compartmentBoundary, "  ",compartment.childrenBoundingRect()
-        #compartmentBoundary =compartment.childrenBoundingRect()
-        #childrenBoundary    = compartment.childrenBoundingRect()
-        #print " 758 ",compartment.childrenBoundaryRect()
         childrenBoundary = calculateChildBoundingRect(compartment)
-        #print " ch ",childrenBoundary
         x = min(compartmentBoundary.x(), childrenBoundary.x())
         y = min(compartmentBoundary.y(), childrenBoundary.y())
         width = max(compartmentBoundary.width(), childrenBoundary.width())

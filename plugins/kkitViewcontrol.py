@@ -66,6 +66,10 @@ class GraphicalView(QtGui.QGraphicsView):
         bound = item.rect().adjusted(3,3,-3,-3)
         return COMPARTMENT_INTERIOR if bound.contains(item.mapFromScene(position)) else COMPARTMENT_BOUNDARY
 
+    def resolveGroupInteriorAndBoundary(self, item, position):
+        bound = item.rect().adjusted(3,3,-3,-3)
+        return GROUP_INTERIOR if bound.contains(item.mapFromScene(position)) else GROUP_BOUNDARY
+
     def resetState(self):
         self.state = { "press"      :   { "mode"     :  INVALID
                                         , "item"     :  None
@@ -83,6 +87,7 @@ class GraphicalView(QtGui.QGraphicsView):
 
     def resolveItem(self, items, position):
         solution = None
+        gsolution = None
         for item in items:
             # if isinstance(item, QtGui.QGraphicsPixmapItem):
             #     return (item, CONNECTOR)
@@ -97,11 +102,25 @@ class GraphicalView(QtGui.QGraphicsView):
                 #print(item.name)
                 if item.name == ITEM:
                     return (item, ITEM)
+                if item.name == GROUP:
+                    gsolution = (item, self.resolveGroupInteriorAndBoundary(item, position))
+                    if gsolution == None:
+                        return(None,EMPTY)  
+                    else:
+                        return gsolution
+
                 if item.name == COMPARTMENT:
                     solution = (item, self.resolveCompartmentInteriorAndBoundary(item, position))
         if solution is None:
             return (None, EMPTY)
         return solution
+    def findGraphic_groupcompt(self,gelement):
+        while not (self.graphicsIsInstance(gelement, ["GRPItemXC","ComptItem"])):
+            gelement = gelement.parentItem()
+        return gelement
+    
+    def graphicsIsInstance(self, gelement, classNames):
+        return gelement.__class__.__name__ in classNames
 
     def editorMousePressEvent(self, event):
         # self.deselectSelections()
@@ -117,13 +136,20 @@ class GraphicalView(QtGui.QGraphicsView):
             self.state["press"]["pos"]  = event.pos()
             #If connector exist and if mousePress on Compartment interior,
             # then removing any connect if exist
-            if itemType == COMPARTMENT_INTERIOR:
+            if itemType == COMPARTMENT_INTERIOR or itemType == GROUP:
                 self.removeConnector()
             elif itemType == ITEM:
                 if not self.move:
                     self.showConnector(self.state["press"]["item"])
             # self.layoutPt.plugin.mainWindow.objectEditSlot(self.state["press"]["item"].mobj, False)
         else:
+            self.clickPosition  = self.mapToScene(event.pos())
+            (item, itemType) = self.resolveItem(self.items(event.pos()), self.clickPosition)
+            if itemType == GROUP_BOUNDARY:
+                    popupmenu = QtGui.QMenu('PopupMenu', self)
+                    popupmenu.addAction("DeleteGroup", lambda : self.deleteGroup(item,self.layoutPt))
+                    popupmenu.addAction("CloneGroup" ,lambda : handleCollisions(comptList, moveMin, self.layoutPt ))
+                    popupmenu.exec_(self.mapToGlobal(event.pos()))
             self.resetState()
             comptList = []
             for k, v in self.layoutPt.qGraCompt.items():
@@ -169,7 +195,7 @@ class GraphicalView(QtGui.QGraphicsView):
                     if moose.exists(itemPath):
                         iInfo = itemPath+'/info'
                         anno = moose.Annotator(iInfo)
-                        modelAnno = moose.Annotator(self.modelRoot+'/info')
+                        #modelAnno = moose.Annotator(self.modelRoot+'/info')
                         x = item.parent().scenePos().x()/self.layoutPt.defaultScenewidth
                         y = item.parent().scenePos().y()/self.layoutPt.defaultSceneheight
                         anno.x = x
@@ -231,6 +257,36 @@ class GraphicalView(QtGui.QGraphicsView):
             self.state["press"]["pos"] = event.pos()
 
         if itemType == COMPARTMENT_INTERIOR:
+            if self.customrubberBand == None:
+                self.customrubberBand = QtGui.QRubberBand(QtGui.QRubberBand.Rectangle,self)
+                self.customrubberBand.show()
+
+            startingPosition = self.state["press"]["pos"]
+            endingPosition = event.pos()
+            displacement   = endingPosition - startingPosition
+
+            x0 = startingPosition.x() 
+            x1 = endingPosition.x()
+            y0 = startingPosition.y() 
+            y1 = endingPosition.y()
+
+            if displacement.x() < 0 :
+                x0,x1= x1,x0
+
+            if displacement.y() < 0 :
+                y0,y1= y1,y0
+
+            self.customrubberBand.setGeometry(QtCore.QRect(QtCore.QPoint(x0, y0), QtCore.QSize(abs(displacement.x()), abs(displacement.y()))))
+
+        if itemType == GROUP_BOUNDARY:
+            initial = self.mapToScene(self.state["press"]["pos"])
+            final = self.mapToScene(event.pos())
+            displacement = final - initial
+            item.moveBy(displacement.x(), displacement.y())
+            self.layoutPt.positionChange(item.mobj.path)
+            self.state["press"]["pos"] = event.pos()
+
+        if itemType == GROUP_INTERIOR:
             if self.customrubberBand == None:
                 self.customrubberBand = QtGui.QRubberBand(QtGui.QRubberBand.Rectangle,self)
                 self.customrubberBand.show()
@@ -317,6 +373,13 @@ class GraphicalView(QtGui.QGraphicsView):
             
             
             if actionType == "move":
+                movedGraphObj = self.state["press"]["item"].parent()
+                movedParentObj = movedGraphObj.parentItem()
+                if itemType != EMPTY:
+                    item = self.findGraphic_groupcompt(item)
+                    if movedGraphObj.parentItem() != item:
+                        movedGraphObj.setParentItem(item)
+                        moose.move(movedGraphObj.mobj, item.mobj)
                 QtGui.QApplication.setOverrideCursor(QtGui.QCursor(Qt.Qt.ArrowCursor))
 
             if actionType == "delete":
@@ -423,7 +486,7 @@ class GraphicalView(QtGui.QGraphicsView):
             popupmenu.addAction("Delete", lambda : self.deleteConnection(item))
             popupmenu.exec_(self.mapToGlobal(event.pos()))
         
-        if clickedItemType == COMPARTMENT_BOUNDARY:
+        if clickedItemType == COMPARTMENT_BOUNDARY  or clickedItemType == GROUP_BOUNDARY:
             if not self.state["move"]["happened"]:
                 self.layoutPt.plugin.mainWindow.objectEditSlot(self.state["press"]["item"].mobj, True)
             self.resetState()
@@ -474,6 +537,12 @@ class GraphicalView(QtGui.QGraphicsView):
             # else:
             #     self.layoutPt.plugin.mainWindow.objectEditSlot(self.state["press"]["item"].mobj, True)
         self.resetState()
+
+    def deleteGroup(self,item,layoutPt):
+        self.groupItemlist1 = item.childItems()
+        self.groupItemlist = [ i for i in self.groupItemlist1 if not isinstance(i,QtGui.QGraphicsPolygonItem)]
+        self.deleteObj(self.groupItemlist)
+        self.deleteItem(item)
 
     def drawExpectedConnection(self, event):
         self.connectionSource = self.state["press"]["item"]
@@ -746,7 +815,7 @@ class GraphicalView(QtGui.QGraphicsView):
         if (key ==  Qt.Qt.Key_A and (event.modifiers() & Qt.Qt.ShiftModifier)): # 'A' fits the view to iconScale factor
             itemignoreZooming = False
             self.updateItemTransformationMode(itemignoreZooming)
-            self.fitInView(self.sceneContainerPt.itemsBoundingRect().x()-10,self.sceneContainerPt.itemsBoundingRect().y()-10,self.sceneContainerPt.itemsBoundingRect().width()+20,self.sceneContainerPt.itemsBoundingRect().height()+20,Qt.Qt.IgnoreAspectRatio)
+            #self.fitInView(self.sceneContainerPt.itemsBoundingRect().x()-10,self.sceneContainerPt.itemsBoundingRect().y()-10,self.sceneContainerPt.itemsBoundingRect().width()+20,self.sceneContainerPt.itemsBoundingRect().height()+20,Qt.Qt.IgnoreAspectRatio)
             self.layoutPt.drawLine_arrow(itemignoreZooming=False)
 
         elif (key == Qt.Qt.Key_Less or key == Qt.Qt.Key_Minus):# and (event.modifiers() & Qt.Qt.ShiftModifier)): # '<' key. zooms-in to iconScale factor
@@ -764,6 +833,7 @@ class GraphicalView(QtGui.QGraphicsView):
             self.scale(1/1.1,1/1.1)
 
         elif (key == Qt.Qt.Key_A):  # 'a' fits the view to initial value where iconscale=1
+            self.iconscale = 1
             self.updateScale( 1 )
             self.fitInView(self.sceneContainerPt.itemsBoundingRect().x()-10,self.sceneContainerPt.itemsBoundingRect().y()-10,self.sceneContainerPt.itemsBoundingRect().width()+20,self.sceneContainerPt.itemsBoundingRect().height()+20,Qt.Qt.IgnoreAspectRatio)
 
@@ -773,8 +843,10 @@ class GraphicalView(QtGui.QGraphicsView):
                 item.refresh(scale)
                 #iteminfo = item.mobj.path+'/info'
                 #xpos,ypos = self.positioninfo(iteminfo)
-                xpos = item.scenePos().x()
-                ypos = item.scenePos().y()
+                # xpos = item.scenePos().x()
+                # ypos = item.scenePos().y()
+                xpos = item.pos().x()
+                ypos = item.pos().y()
                 if isinstance(item,ReacItem) or isinstance(item,EnzItem) or isinstance(item,MMEnzItem):
                     item.setGeometry(xpos,ypos,
                                      item.gobj.boundingRect().width(),
@@ -814,10 +886,13 @@ class GraphicalView(QtGui.QGraphicsView):
 
     def deleteSelections(self,x0,y0,x1,y1):
         if( x1-x0 > 0  and y1-y0 >0):
-            self.rubberbandlist = self.sceneContainerPt.items(self.mapToScene(QtCore.QRect(x0, y0, x1 - x0, y1 - y0)).boundingRect(), Qt.Qt.IntersectsItemShape)
-            for unselectitem in self.rubberbandlist:
+            # self.rubberbandlist = self.sceneContainerPt.items(self.mapToScene(QtCore.QRect(x0, y0, x1 - x0, y1 - y0)).boundingRect(), Qt.Qt.IntersectsItemShape)
+            # for unselectitem in self.rubberbandlist:
+            
+            for unselectitem in self.rubberbandlist_qpolygon:
                 if unselectitem.isSelected() == True:
                     unselectitem.setSelected(0)
+            self.rubberbandlist_qpolygon = self.sceneContainerPt.items(self.mapToScene(QtCore.QRect(x0, y0, x1 - x0, y1 - y0)).boundingRect(), Qt.Qt.IntersectsItemShape)
             self.deleteObj(self.rubberbandlist)
             # deleteSolver(self.layoutPt.modelRoot)
             # for item in (qgraphicsitem for qgraphicsitem in self.rubberbandlist):
@@ -841,23 +916,63 @@ class GraphicalView(QtGui.QGraphicsView):
     def deleteObj(self,item):
         self.rubberbandlist = item
         deleteSolver(self.layoutPt.modelRoot)
-        for item in (qgraphicsitem for qgraphicsitem in self.rubberbandlist):
+        self.Enz_cplxlist   = [ i for i in self.rubberbandlist if (isinstance(i,MMEnzItem) or isinstance(i,EnzItem) or isinstance(i,CplxItem) )]
+        self.PFRSlist       = [ i for i in self.rubberbandlist if (isinstance(i,PoolItem) or isinstance(i,TableItem) or isinstance(i,ReacItem) or isinstance(i,FuncItem) )]
+        self.grp            = [ i for i in self.rubberbandlist if isinstance(i,GRPItemXC)]
+        for item in self.Enz_cplxlist:
             #First Loop to remove all the enz b'cos if parent (which is a Pool) is removed,
             #then it will created problem at qgraphicalitem not having parent.
             #So first delete enz and then delete pool
-                if isinstance(item,MMEnzItem) or isinstance(item,EnzItem) or isinstance(item,CplxItem):
-                    self.deleteItem(item)
+            self.deleteItem(item)
+        for item in self.PFRSlist:
+            if isinstance(item,PoolItem) or isinstance(item,BufPool):
+                plot = moose.wildcardFind(self.layoutPt.modelRoot+'/data/graph#/#')
+                for p in plot:
+                    if len(p.neighbors['requestOut']):
+                        if item.mobj.path == moose.element(p.neighbors['requestOut'][0]).path:
+                            p.tick = -1
+                            moose.delete(p)
+                            self.layoutPt.plugin.view.getCentralWidget().plotWidgetContainer.plotAllData()
+            self.deleteItem(item)
+        for item in self.grp:
+            self.deleteItem(item)
+        # for item in (qgraphicsitem for qgraphicsitem in self.rubberbandlist):
+        #     #First Loop to remove all the enz b'cos if parent (which is a Pool) is removed,
+        #     #then it will created problem at qgraphicalitem not having parent.
+        #     #So first delete enz and then delete pool
+        #         print " \t \t item 938 ",item.mobj
+
+        #         if isinstance(item,MMEnzItem) or isinstance(item,EnzItem) or isinstance(item,CplxItem):
+        #             print " \t \t 940 ",item.mobj
+        #             self.deleteItem(item)
+        #             #self.rubberbandlist.remove(item)
+        '''
         for item in (qgraphicsitem for qgraphicsitem in self.rubberbandlist):
-            if not (isinstance(item,MMEnzItem) or isinstance(item,EnzItem) or isinstance(item,CplxItem)):
-                if isinstance(item,PoolItem):
-                    plot = moose.wildcardFind(self.layoutPt.modelRoot+'/data/graph#/#')
-                    for p in plot:
-                        if len(p.neighbors['requestOut']):
-                            if item.mobj.path == moose.element(p.neighbors['requestOut'][0]).path:
-                                p.tick = -1
-                                moose.delete(p)
-                                self.layoutPt.plugin.view.getCentralWidget().plotWidgetContainer.plotAllData()
+            print " item2 ",item
+            if isinstance(item,PoolItem) or isinstance(item,BufPool):
+                plot = moose.wildcardFind(self.layoutPt.modelRoot+'/data/graph#/#')
+                for p in plot:
+                    if len(p.neighbors['requestOut']):
+                        if item.mobj.path == moose.element(p.neighbors['requestOut'][0]).path:
+                            p.tick = -1
+                            moose.delete(p)
+                            self.layoutPt.plugin.view.getCentralWidget().plotWidgetContainer.plotAllData()
                 self.deleteItem(item)
+                self.rubberbandlist.remove(item)
+
+            elif( isinstance(item,ReacItem) or isinstance(item,FuncItem) or isinstance(item,TableItem) ):
+                self.deleteItem(item)
+                self.rubberbandlist.remove(item)
+        
+        print " state "
+
+        t = [ i for i in self.rubberbandlist if isinstance(i,GRPItemXC)]
+        for grpItem in t:
+            self.deleteItem(grpItem)
+            self.rubberbandlist.remove(grpItem)
+        print " t ",t
+        print " end "
+        '''
 
     def deleteObject2line(self,qpolygonline,src,des,endt):
         object2lineInfo = self.layoutPt.object2line[des]
@@ -866,7 +981,7 @@ class GraphicalView(QtGui.QGraphicsView):
                 if polygon == qpolygonline and objdes == src and endtype == endt:
                     del(self.layoutPt.object2line[des])
                 else:
-                    print " check this condition when is len is single and else condition",qpolygonline, objdes,endtype
+                    print( " check this condition when is len is single and else condition",qpolygonline, objdes,endtype)
         else:
             n = 0
             for polygon,objdes,endtype,numL in object2lineInfo:
@@ -1003,7 +1118,7 @@ class GraphicalView(QtGui.QGraphicsView):
         #delete Items 
 
         self.layoutPt.plugin.mainWindow.objectEditSlot('/', False)
-        if isinstance(item,KineticsDisplayItem):
+        if isinstance(item,KineticsDisplayItem)  or isinstance(item,GRPItem):
             if moose.exists(item.mobj.path):
                 # if isinstance(item.mobj,Function):
                 #     print " inside the function"
@@ -1119,7 +1234,7 @@ class GraphicalView(QtGui.QGraphicsView):
             founds, foundp = False,False
             
             if isinstance(moose.element(des),EnzBase):
-                print moose.element(des).neighbors["subOut"]
+                print (moose.element(des).neighbors["subOut"])
                 if len(moose.element(des).neighbors["subOut"]) > 0:
                     founds = True
                 
