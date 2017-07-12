@@ -452,6 +452,35 @@ class CplxItem(KineticsDisplayItem):
     
         self.gobj.setRect(0,0,defaultWidth,defaultHeight)
 
+class GRPItem(QtGui.QGraphicsRectItem):
+    #This is used for displaying Grp Item
+    name = GROUP
+    def __init__(self,parent,x,y,w,h,item):
+        self.grpEmitter = QtCore.QObject()
+        QtGui.QGraphicsRectItem.__init__(self,x,y,w,h,parent)
+        self.mobj = item
+        self.setFlag(QtGui.QGraphicsItem.ItemIsMovable, True);
+        self.setFlag(QtGui.QGraphicsItem.ItemIsSelectable)
+        QT_VERSION = str(QtCore.QT_VERSION_STR).split('.')
+        QT_MINOR_VERSION = int(QT_VERSION[1])
+        if config.QT_MINOR_VERSION >= 6:
+            self.setFlag(QtGui.QGraphicsItem.ItemSendsGeometryChanges, 1) 
+    
+    # def paint(self, painter=None, option=None, widget = None):
+    #     #If item is selected
+    #     if self.hasFocus() or self.isSelected():
+    #         painter.setPen(QtGui.QPen(QtGui.QPen(QtCore.Qt.black, 1.8,Qt.Qt.DashLine, Qt.Qt.RoundCap, Qt.Qt.RoundJoin)))
+    #         painter.drawRect(self.boundingRect())
+            
+    def itemChange(self,change,value):
+        if change == QtGui.QGraphicsItem.ItemPositionChange:
+            self.grpEmitter.emit(QtCore.SIGNAL("qgtextPositionChange(PyQt_PyObject)"),self.mobj)
+
+        if change == QtGui.QGraphicsItem.ItemSelectedChange and value == True:
+           self.grpEmitter.emit(QtCore.SIGNAL("qgtextItemSelectedChange(PyQt_PyObject)"),self.mobj)
+        
+        return QtGui.QGraphicsItem.itemChange(self,change,value)
+
 class ComptItem(QtGui.QGraphicsRectItem):
     name = COMPARTMENT
     def __init__(self,parent,x,y,w,h,item):
@@ -626,7 +655,6 @@ class ComptItem(QtGui.QGraphicsRectItem):
         if change == QtGui.QGraphicsItem.ItemSelectedChange and value == True:
            self.cmptEmitter.emit(QtCore.SIGNAL("qgtextItemSelectedChange(PyQt_PyObject)"),self.mobj)
         return QtGui.QGraphicsItem.itemChange(self,change,value)
-
 
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
