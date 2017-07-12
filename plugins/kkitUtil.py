@@ -1,5 +1,5 @@
-from moose import Annotator
-from kkitQGraphics import PoolItem, ReacItem,EnzItem,CplxItem,ComptItem
+from moose import Annotator, element, delete
+from kkitQGraphics import PoolItem, ReacItem, EnzItem, CplxItem, GRPItem, ComptItem
 from PyQt4 import QtCore,QtGui,QtSvg
 from PyQt4.QtGui import QColor
 import numpy as np
@@ -141,10 +141,16 @@ def calculateChildBoundingRect(compt):
         ''' All the children including pool,reac,enz,polygon(arrow),table '''
         if not isinstance(l,QtSvg.QGraphicsSvgItem):
             if (not isinstance(l,QtGui.QGraphicsPolygonItem)):
-                xpos.append((l.pos().x())+(l.boundingRect().bottomRight().x()))
-                xpos.append(l.pos().x())
-                ypos.append(l.pos().y()+l.boundingRect().bottomRight().y())
-                ypos.append(l.pos().y())
+                if (not isinstance(l,GRPItem)):
+                    xpos.append((l.pos().x())+(l.boundingRect().bottomRight().x()))
+                    xpos.append(l.pos().x())
+                    ypos.append(l.pos().y()+l.boundingRect().bottomRight().y())
+                    ypos.append(l.pos().y())
+            else:
+                    xpos.append((l.pos().x())+(l.boundingRect().bottomRight().x()))
+                    xpos.append(l.pos().x())
+                    ypos.append(l.pos().y()+l.boundingRect().bottomRight().y())
+                    ypos.append(l.pos().y())
         if (isinstance(l,PoolItem) or isinstance(l,EnzItem)):
             ''' For Enz cplx height and for pool function height needs to be taken'''
             for ll in l.childItems():
