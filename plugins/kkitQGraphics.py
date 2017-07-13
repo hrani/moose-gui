@@ -461,6 +461,8 @@ class GRPItem(QtGui.QGraphicsRectItem):
         self.mobj = item
         self.setFlag(QtGui.QGraphicsItem.ItemIsMovable, True);
         self.setFlag(QtGui.QGraphicsItem.ItemIsSelectable)
+        self.setAcceptHoverEvents(True)
+        self.setToolTip(self.mobj.name)
         QT_VERSION = str(QtCore.QT_VERSION_STR).split('.')
         QT_MINOR_VERSION = int(QT_VERSION[1])
         if config.QT_MINOR_VERSION >= 6:

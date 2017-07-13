@@ -918,7 +918,7 @@ class GraphicalView(QtGui.QGraphicsView):
         deleteSolver(self.layoutPt.modelRoot)
         self.Enz_cplxlist   = [ i for i in self.rubberbandlist if (isinstance(i,MMEnzItem) or isinstance(i,EnzItem) or isinstance(i,CplxItem) )]
         self.PFRSlist       = [ i for i in self.rubberbandlist if (isinstance(i,PoolItem) or isinstance(i,TableItem) or isinstance(i,ReacItem) or isinstance(i,FuncItem) )]
-        self.grp            = [ i for i in self.rubberbandlist if isinstance(i,GRPItemXC)]
+        self.grp            = [ i for i in self.rubberbandlist if isinstance(i,GRPItem)]
         for item in self.Enz_cplxlist:
             #First Loop to remove all the enz b'cos if parent (which is a Pool) is removed,
             #then it will created problem at qgraphicalitem not having parent.
