@@ -6,7 +6,7 @@ __version__     =   "1.0.0"
 __maintainer__  =   "HarshaRani"
 __email__       =   "hrani@ncbs.res.in"
 __status__      =   "Development"
-__updated__     =   "July 11 2017"
+__updated__     =   "July 14 2017"
 import math
 import sys
 from PyQt4 import QtGui, QtCore, Qt
@@ -560,7 +560,7 @@ class  KineticsWidget(EditorWidgetBase):
                 self.setupDisplay(cplxinfo,cplxItem,"cplx")
 
         # compartment's rectangle size is calculated depending on children
-        self.comptChilrenBoundingRect()
+        self.comptChildrenBoundingRect()
     '''
     def mooseObjOntoscene(self):
         #  All the compartments are put first on to the scene \
@@ -610,7 +610,7 @@ class  KineticsWidget(EditorWidgetBase):
 
         self.groupChildrenBoundingRect()
         # compartment's rectangle size is calculated depending on children
-        self.comptChilrenBoundingRect()
+        self.comptChildrenBoundingRect()
 
     def mObjontoscene(self,memb,mclass,qtGrpparent):
         try:
@@ -664,9 +664,10 @@ class  KineticsWidget(EditorWidgetBase):
             v.setRect(rectcompt.x()-10,rectcompt.y()-10,(rectcompt.width()+20),(rectcompt.height()+20))
             v.setPen(QtGui.QPen(Qt.QColor(grpcolor), self.comptPen, Qt.Qt.SolidLine, Qt.Qt.RoundCap, Qt.Qt.RoundJoin))
 
-    def comptChilrenBoundingRect(self):
+    def comptChildrenBoundingRect(self):
         for k, v in self.qGraCompt.items():
             # compartment's rectangle size is calculated depending on children
+            
             rectcompt = calculateChildBoundingRect(v)
             v.setRect(rectcompt.x()-10,rectcompt.y()-10,(rectcompt.width()+20),(rectcompt.height()+20))
             v.setPen(QtGui.QPen(Qt.QColor(66,66,66,100), self.comptPen, Qt.Qt.SolidLine, Qt.Qt.RoundCap, Qt.Qt.RoundJoin))
@@ -863,9 +864,11 @@ class  KineticsWidget(EditorWidgetBase):
                             self.updateArrow(grpChilditem)
                             grpcompt = self.qGraCompt[self.objPar[k]]
                             rectcompt = calculateChildBoundingRect(grpcompt)
-                            comptBoundingRect = grpcompt.boundingRect()
+                            #comptBoundingRect = grpcompt.boundingRect()
+                            comptBoundingRect = v.boundingRect()
                             if not comptBoundingRect.contains(rectcompt):
-                                self.updateCompartmentSize(grpcompt)
+                                #self.updateCompartmentSize(grpcompt)
+                                pass
                             else:
                                 pass
                             '''
@@ -875,7 +878,6 @@ class  KineticsWidget(EditorWidgetBase):
                                 self.updateCompartmentSize(grpcompt)
                             '''
         else:
-            print " why are else calling ", mooseObject
             mobj = self.mooseId_GObj[element(mooseObject)]
             self.updateArrow(mobj)
             elePath = moose.element(mooseObject).path
@@ -889,7 +891,9 @@ class  KineticsWidget(EditorWidgetBase):
                 if not comptBoundingRect.contains(rectcompt):
                     self.updateCompartmentSize(v)
                 else:
-                    print " Y"
+                    rectcompt = calculateChildBoundingRect(v)
+                    v.setRect(rectcompt.x()-10,rectcompt.y()-10,(rectcompt.width()+20),(rectcompt.height()+20))
+                    pass
                 '''
                 if linfo.modeltype == "new_kkit":
                     #if newly built model then compartment is size is fixed for some size.

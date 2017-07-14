@@ -115,7 +115,7 @@ class GraphicalView(QtGui.QGraphicsView):
             return (None, EMPTY)
         return solution
     def findGraphic_groupcompt(self,gelement):
-        while not (self.graphicsIsInstance(gelement, ["GRPItemXC","ComptItem"])):
+        while not (self.graphicsIsInstance(gelement, ["GRPItem","ComptItem"])):
             gelement = gelement.parentItem()
         return gelement
     
@@ -190,35 +190,35 @@ class GraphicalView(QtGui.QGraphicsView):
                 #initial = item.parent().pos()
                 final = self.mapToScene(event.pos())
                 displacement = final-initial
-                if isinstance(item.parent(),KineticsDisplayItem):
-                    itemPath = item.parent().mobj.path
-                    if moose.exists(itemPath):
-                        iInfo = itemPath+'/info'
-                        anno = moose.Annotator(iInfo)
-                        #modelAnno = moose.Annotator(self.modelRoot+'/info')
-                        x = item.parent().scenePos().x()/self.layoutPt.defaultScenewidth
-                        y = item.parent().scenePos().y()/self.layoutPt.defaultSceneheight
-                        anno.x = x
-                        anno.y = y
-                        '''
-                        if modelAnno.modeltype == "kkit":
-                            # x = ((self.mapToScene(event.pos()).x())+(self.minmaxratioDict['xmin']*self.minmaxratioDict['xratio']))/self.minmaxratioDict['xratio']
-                            # y = (1.0 - self.mapToScene(event.pos()).y()+(self.minmaxratioDict['ymin']*self.minmaxratioDict['yratio']))/self.minmaxratioDict['yratio']
-                            # anno.x = x
-                            # anno.y = y
-                            print " kvc CONNECTOR ",item.parent().mobj, displacement.x(), " y ",displacement.y()
-                            print "scenePos CONNECTOR",item.parent().scenePos().x(),item.parent().scenePos().y(), 
-                            print "dive x ",item.parent().scenePos().x()/1000, " y ",item.parent().scenePos().y()/500
-                            #item.parent().update()
-                            #self.updateScale(1)
-                            x = item.parent().scenePos().x()/1000
-                            y = item.parent().scenePos().y()/500
-                            anno.x = x
-                            anno.y = y
-                        elif(modelAnno.modeltype == "new_kkit" or modelAnno.modeltype == "sbml" or modelAnno.modeltype == "cspace"):
-                            anno.x = self.mapToScene(event.pos()).x()
-                            anno.y = self.mapToScene(event.pos()).y()
-                        '''
+                # if isinstance(item.parent(),KineticsDisplayItem):
+                #     itemPath = item.parent().mobj.path
+                #     if moose.exists(itemPath):
+                #         iInfo = itemPath+'/info'
+                #         anno = moose.Annotator(iInfo)
+                #         #modelAnno = moose.Annotator(self.modelRoot+'/info')
+                #         x = item.parent().scenePos().x()/self.layoutPt.defaultScenewidth
+                #         y = item.parent().scenePos().y()/self.layoutPt.defaultSceneheight
+                #         #anno.x = x
+                #         #anno.y = y
+                #         '''
+                #         if modelAnno.modeltype == "kkit":
+                #             # x = ((self.mapToScene(event.pos()).x())+(self.minmaxratioDict['xmin']*self.minmaxratioDict['xratio']))/self.minmaxratioDict['xratio']
+                #             # y = (1.0 - self.mapToScene(event.pos()).y()+(self.minmaxratioDict['ymin']*self.minmaxratioDict['yratio']))/self.minmaxratioDict['yratio']
+                #             # anno.x = x
+                #             # anno.y = y
+                #             print " kvc CONNECTOR ",item.parent().mobj, displacement.x(), " y ",displacement.y()
+                #             print "scenePos CONNECTOR",item.parent().scenePos().x(),item.parent().scenePos().y(), 
+                #             print "dive x ",item.parent().scenePos().x()/1000, " y ",item.parent().scenePos().y()/500
+                #             #item.parent().update()
+                #             #self.updateScale(1)
+                #             x = item.parent().scenePos().x()/1000
+                #             y = item.parent().scenePos().y()/500
+                #             anno.x = x
+                #             anno.y = y
+                #         elif(modelAnno.modeltype == "new_kkit" or modelAnno.modeltype == "sbml" or modelAnno.modeltype == "cspace"):
+                #             anno.x = self.mapToScene(event.pos()).x()
+                #             anno.y = self.mapToScene(event.pos()).y()
+                #         '''
                 #if not isinstance(item.parent(),FuncItem) and not isinstance(item.parent(),CplxItem):
                 if not isinstance(item.parent(),CplxItem):
                     self.removeConnector()
@@ -339,7 +339,7 @@ class GraphicalView(QtGui.QGraphicsView):
                     self.showConnector(self.state["press"]["item"])
                     self.layoutPt.plugin.mainWindow.objectEditSlot(self.state["press"]["item"].mobj, True)
                 # compartment's rectangle size is calculated depending on children
-                #self.layoutPt.comptChilrenBoundingRect()
+                #self.layoutPt.comptChildrenBoundingRect()
                 l = self.modelRoot
                 if self.modelRoot.find('/',1) > 0:
                     l = self.modelRoot[0:self.modelRoot.find('/',1)]
@@ -370,16 +370,35 @@ class GraphicalView(QtGui.QGraphicsView):
         self.move = False
         if clickedItemType  == CONNECTOR:
             actionType = str(self.state["press"]["item"].data(0).toString())
-            
-            
             if actionType == "move":
+                tobemoved = True
                 movedGraphObj = self.state["press"]["item"].parent()
-                movedParentObj = movedGraphObj.parentItem()
                 if itemType != EMPTY:
                     item = self.findGraphic_groupcompt(item)
                     if movedGraphObj.parentItem() != item:
-                        movedGraphObj.setParentItem(item)
-                        moose.move(movedGraphObj.mobj, item.mobj)
+                        if moose.exists(item.mobj.path+'/'+movedGraphObj.mobj.name):
+                            desObj = item.mobj.className
+                            if desObj == "CubeMesh" or desObj == "CyclMesh":
+                                desObj = "compartment"
+                            elif desObj == "Neutral":
+                                desObj = "group"
+                            tobemoved = False
+                            self.layoutPt.setupDisplay(movedGraphObj.mobj.path+'/info',movedGraphObj,"pool")
+                            self.layoutPt.updateArrow(movedGraphObj)
+                            QtGui.QMessageBox.warning(None,'Could not move the object', "The object name  \'%s\' exist in \'%s\' %s" %(movedGraphObj.mobj.name,item.mobj.name,desObj))
+                        else:
+                            movedGraphObj.setParentItem(item)
+                            moose.move(movedGraphObj.mobj, item.mobj)
+                if tobemoved:
+                    if isinstance(movedGraphObj,KineticsDisplayItem):
+                        itemPath = movedGraphObj.mobj.path
+                        if moose.exists(itemPath):
+                            iInfo = itemPath+'/info'
+                            anno = moose.Annotator(iInfo)
+                            x = movedGraphObj.scenePos().x()/self.layoutPt.defaultScenewidth
+                            y = movedGraphObj.scenePos().y()/self.layoutPt.defaultSceneheight
+                            anno.x = x
+                            anno.y = y
                 QtGui.QApplication.setOverrideCursor(QtGui.QCursor(Qt.Qt.ArrowCursor))
 
             if actionType == "delete":
@@ -862,7 +881,7 @@ class GraphicalView(QtGui.QGraphicsView):
                     item.bg.setRect(0, 0, item.gobj.boundingRect().width()+PoolItem.fontMetrics.width('  '), item.gobj.boundingRect().height())
 
         self.layoutPt.drawLine_arrow(itemignoreZooming=False)
-        self.layoutPt.comptChilrenBoundingRect()
+        self.layoutPt.comptChildrenBoundingRect()
         #compartment width is resize according apart from calculating boundingRect
         # for k, v in self.layoutPt.qGraCompt.items():
         #     rectcompt = v.childrenBoundingRect()
