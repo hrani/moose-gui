@@ -224,6 +224,7 @@ class MWindow(QtGui.QMainWindow):
             k = self.menuitems.popitem(0)
             t = k[0]
             button = QPushButton(k[0])
+
             if k[0] == "Fig2E":
                 button.setToolTip("<span style=\"color:black;\">Illustrates loading a model from an SWC file, inserting  channels, and running it</span>")
             elif k[0] == "Fig2D (35s)":
@@ -262,7 +263,7 @@ class MWindow(QtGui.QMainWindow):
                 layout6.addWidget(button)
             elif k[0] in ["Squid"]:
                 layout7.addWidget(button)
-
+            
             if k[0] == "Fig3C_Gsl":
                 button.clicked.connect(lambda x, script = k[1]: self.run_genesis_script(script,"gsl"))
             elif k[0] == "Fig3B_Gssa":
@@ -300,6 +301,7 @@ class MWindow(QtGui.QMainWindow):
         widget.runSimulation()
 
     def run_python_script(self, filepath):
+        print " filepath ",filepath
         busyCursor()
         import subprocess, shlex
         t = os.path.abspath(filepath)
@@ -458,6 +460,7 @@ class MWindow(QtGui.QMainWindow):
                 break
         
         self.plugin = self.loadPluginClass(str(name))(str(root), self)
+        #print " self.plugin ",self.plugin
         moose.reinit()
 
         self.updateMenus()
@@ -628,7 +631,7 @@ class MWindow(QtGui.QMainWindow):
             self.connect(self.loadModelAction, QtCore.SIGNAL('triggered()'), self.loadModelDialogSlot)
         self.fileMenu.addAction(self.loadModelAction)
 
-        if not hasattr(self, 'Paper_2015'):
+        if not hasattr(self, 'Demos'):
             self.menuitems = OrderedDict([
                                         ("Fig2C (6s)" ,     "../moose-examples/paper-2015/Fig2_elecModels/Fig2C.py"),
                                         ("Fig2D (35s)",     "../moose-examples/paper-2015/Fig2_elecModels/Fig2D.py"),
@@ -644,21 +647,63 @@ class MWindow(QtGui.QMainWindow):
                                         ("Reduced6 (200s)", "../moose-examples/paper-2015/Fig6_NetMultiscale/ReducedModel.py"),
                                         ("Squid" ,          "../moose-examples/squid/squid_demo.py")
                                      ])
-            self.subMenu = QtGui.QMenu('Paper_2015_Demos')
+            self.subMenu = QtGui.QMenu('Demos')
             for i in range(0,len(self.menuitems)):
                 k = self.menuitems.popitem(0)
-                t = "self."+k[0]+"Action"
-                t = QtGui.QAction(k[0],self)
-                self.subMenu.addAction(t)
-                if k[0] == "Fig3C_Gsl (2s)":
-                    t.connect(t,QtCore.SIGNAL('triggered()'),lambda script = k[1]: self.run_genesis_script(script,"gsl"))
+                if k[0] == "Fig2C (6s)":
+                    self.Fig2Caction = QtGui.QAction('Fig2C (6s)', self)
+                    self.Fig2Caction.triggered.connect(lambda :self.run_python_script('../moose-examples/paper-2015/Fig2_elecModels/Fig2C.py'))
+                    self.subMenu.addAction(self.Fig2Caction)
+                elif k[0] == "Fig2D (35s)":
+                    self.Fig2Daction = QtGui.QAction('Fig2D (35s)', self)
+                    self.Fig2Daction.triggered.connect(lambda :self.run_python_script('../moose-examples/paper-2015/Fig2_elecModels/Fig2D.py'))
+                    self.subMenu.addAction(self.Fig2Daction)
+                elif k[0] == "Fig2E (5s)":
+                    self.Fig2Eaction = QtGui.QAction('Fig2E (5s)', self)
+                    self.Fig2Eaction.triggered.connect(lambda :self.run_python_script('../moose-examples/paper-2015/Fig2_elecModels/Fig2E.py'))
+                    self.subMenu.addAction(self.Fig2Eaction)
                 elif k[0] == "Fig3B_Gssa (2s)":
-                    t.connect(t,QtCore.SIGNAL('triggered()'),lambda script = k[1]: self.run_genesis_script(script,"gssa"))
+                    self.Fig3B_Gssaaction = QtGui.QAction('Fig3B_Gssa (2s)', self)
+                    self.Fig3B_Gssaaction.triggered.connect(lambda :self.run_genesis_script('../moose-examples/paper-2015/Fig3_chemModels/Fig3ABC.g',"gssa"))
+                    self.subMenu.addAction(self.Fig3B_Gssaaction)
+                elif k[0] == "Fig3C_Gsl (2s)":
+                    self.Fig3C_Gslaction = QtGui.QAction('Fig3C_Gsl (2s)', self)
+                    self.Fig3C_Gslaction.triggered.connect(lambda :self.run_genesis_script('../moose-examples/paper-2015/Fig3_chemModels/Fig3ABC.g',"gsl"))
+                    self.subMenu.addAction(self.Fig3C_Gslaction)
+                elif k[0] == "Fig3D (1s)":
+                    self.Fig3Daction = QtGui.QAction('Fig3D (1s)', self)
+                    self.Fig3Daction.triggered.connect(lambda :self.run_python_script('../moose-examples/paper-2015/Fig3_chemModels/Fig3D.py'))
+                    self.subMenu.addAction(self.Fig3Daction)
+                elif k[0] == "Fig4B (10s)":
+                    self.Fig4Baction = QtGui.QAction('Fig4B (10s)', self)
+                    self.Fig4Baction.triggered.connect(lambda :self.run_python_script('../moose-examples/paper-2015/Fig4_ReacDiff/Fig4B.py'))
+                    self.subMenu.addAction(self.Fig4Baction)
+                elif k[0] == "Fig4K":
+                    self.Fig4Kaction = QtGui.QAction('Fig4K', self)
+                    self.Fig4Kaction.triggered.connect(lambda :self.run_python_script('../moose-examples/paper-2015/Fig4_ReacDiff/rxdSpineSize.py'))
+                    self.subMenu.addAction(self.Fig4Kaction)
+                elif k[0] == "Fig5A (20s)":
+                    self.Fig5Aaction = QtGui.QAction('Fig5A (20s)', self)
+                    self.Fig5Aaction.triggered.connect(lambda :self.run_python_script('../moose-examples/paper-2015/Fig5_CellMultiscale/Fig5A.py'))
+                    self.subMenu.addAction(self.Fig5Aaction)
+                elif k[0] == "Fig5BCD (240s)":
+                    self.Fig5BCDaction = QtGui.QAction('Fig5BCD (240s)', self)
+                    self.Fig5BCDaction.triggered.connect(lambda :self.run_python_script('../moose-examples/paper-2015/Fig5_CellMultiscale/Fig5BCD.py'))
+                    self.subMenu.addAction(self.Fig5BCDaction)
+                elif k[0] == "Fig6A (60s)":
+                    self.Fig6Aaction = QtGui.QAction('Fig6A (60s)', self)
+                    self.Fig6Aaction.triggered.connect(lambda :self.run_python_script('../moose-examples/paper-2015/Fig6_NetMultiscale/Fig6A.py'))
+                    self.subMenu.addAction(self.Fig6Aaction)
+                elif k[0] == "ReducedModel (200s)":
+                    self.ReducedModelaction = QtGui.QAction('ReducedModel (200s)', self)
+                    self.ReducedModelaction.triggered.connect(lambda :self.run_python_script('../moose-examples/paper-2015/Fig6_NetMultiscale/ReducedModel.py'))
+                    self.subMenu.addAction(self.ReducedModelaction)
                 else:
-                    t.connect(t,QtCore.SIGNAL('triggered()'),lambda : self.run_python_script(k[1]))
-                self.subMenu.addAction(t)    
+                    self.Squidaction = QtGui.QAction('Squid', self)
+                    self.Squidaction.triggered.connect(lambda :self.run_python_script('../moose-examples/squid/squid_demo.py'))
+                    self.subMenu.addAction(self.Squidaction)
+                
             self.fileMenu.addMenu(self.subMenu)
-
         if not hasattr(self,'loadedModels'):
             self.loadedModelAction = QtGui.QAction('Recently Loaded Models',self)
             self.loadedModelAction.setCheckable(False)
@@ -1105,6 +1150,7 @@ class MWindow(QtGui.QMainWindow):
             ret = []
             ret,pluginName = self.checkPlugin(dialog)
             if pluginName == 'kkit':
+		print " ## ",ret['model']
                 compt = moose.wildcardFind(ret['model'].path+'/##[ISA=ChemCompt]')
                 if not len(compt):
                     reply = QtGui.QMessageBox.question(self, "Model is empty","Model has no compartment, atleast one compartment should exist to display the widget\n Do you want another file",
@@ -1165,7 +1211,8 @@ class MWindow(QtGui.QMainWindow):
                 pluginName = subtype_plugin_map['%s/%s' % (ret['modeltype'], ret['subtype'])]
             except KeyError:
                 pluginName = 'default'
-            print 'Loaded model', ret['model'].path
+            #print 'Loaded model', ret['model'].path
+	    print ('Loaded model', ret['model'])
             return ret,pluginName
 
     def dialog_check(self,ret):
